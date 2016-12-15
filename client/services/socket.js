@@ -1,4 +1,10 @@
 var io = require('socket.io-client');
-var socket = io('http://ttt-server.herokuapp.com');
+
+const locally = true;
+if (locally){
+  var socket = io('http://localhost');
+} else {
+  var socket = io('http://ttt-server.herokuapp.com');
+}
 
 module.exports = socket;
