@@ -15,8 +15,18 @@ var GameField = React.createClass({
 
     componentDidMount: function () {
         var self = this;
+        //Если приконнектился продолжать
+        socket.on('continue game', function (gameData) {
+            console.log("Игра продолжается");
 
-        //Процесс игры
+            //Показать поле
+            self.setState({shown: true});
+
+            //отображение текущего положения дел
+            
+
+        });
+        //Процесс новой игры
         socket.on('start game', function () {
             console.log("Игра началась");
 
