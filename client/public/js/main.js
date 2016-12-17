@@ -74,7 +74,7 @@ var Chat = React.createClass({
 
     componentDidMount: function () {
         var self = this;
-        socket.on('start game', function () {
+        socket.on('game status', function () {
             console.log("Игра началась");
             self.setState({
                 shown: true
@@ -153,14 +153,25 @@ var GameField = React.createClass({
             shown: false,
             fieldState: ["empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty"],
             myTurn: false,
-            mySymbol: 'x'
+            mySymbol: 'x',
+            myNumber: 1
         };
     },
 
     componentDidMount: function () {
         var self = this;
+        //Если приконнектился продолжать
+        socket.on('game status', function (gameData) {
+            console.log("Игра продолжается");
 
-        //Процесс игры
+            //Показать поле
+            self.setState({ shown: true });
+
+            //отображение текущего положения дел
+            self.updateFieldState(gameData.field);
+            self.setState({ myTurn: gameData.nowTurn, myNumber: gameData.playerNumber });
+        });
+        //Процесс новой игры
         socket.on('start game', function () {
             console.log("Игра началась");
 
@@ -181,9 +192,17 @@ var GameField = React.createClass({
         });
     },
 
-    updateFieldState: function (id, state) {
-        var tmp = this.state.fieldState;
-        tmp[id - 1] = state;
+    updateFieldState: function (state) {
+        var tmp = [];
+        for (var i = 0; i < state.length; i++) {
+            if (state[i] == 1) {
+                tmp[i] = 'x';
+            } else if (state[i] == -1) {
+                tmp[i] = 'o';
+            } else {
+                tmp[i] = 'empty';
+            }
+        }
         this.setState({ fieldState: tmp });
     },
 
@@ -192,9 +211,16 @@ var GameField = React.createClass({
             var target = e.target;
             if (this.state.fieldState[target.id - 1] == "empty") {
                 this.setState({ myTurn: false });
-                this.updateFieldState(target.id, this.state.mySymbol);
+                //обновить поле
+                var tmp = this.state.fieldState;
+                if (this.state.myNumber == 1) {
+                    tmp[target.id - 1] = "x";
+                } else if (this.state.myNumber == 2) {
+                    tmp[target.id - 1] = "o";
+                }
+                this.setState({ fieldState: tmp });
                 //отправить свой ход на сервер
-                socket.emit('turn finished', target.id);
+                socket.emit('turn done', { targetId: target.id });
                 soundManager.play('turn_finished');
             }
         }
@@ -367,7 +393,7 @@ var StatusBar = React.createClass({
     },
     componentDidMount: function () {
         var self = this;
-        socket.on('start game', function () {
+        socket.on('game status', function () {
             console.log("Игра началась");
             self.setState({ shown: true });
 

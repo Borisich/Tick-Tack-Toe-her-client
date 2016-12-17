@@ -16,7 +16,7 @@ var StatusBar = React.createClass({
     },
     componentDidMount: function () {
         var self = this;
-        socket.on('start game', function () {
+        socket.on('game status', function () {
             console.log("Игра началась");
             self.setState({shown: true});
 
