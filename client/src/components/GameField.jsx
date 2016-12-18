@@ -9,43 +9,20 @@ var GameField = React.createClass({
             shown: false,
             fieldState: ["empty","empty","empty","empty","empty","empty","empty","empty","empty"],
             myTurn: false,
-            mySymbol: 'x',
             myNumber: 1
         };
     },
 
     componentDidMount: function () {
         var self = this;
-        //Если приконнектился продолжать
+
         socket.on('game status', function (gameData) {
-            console.log("Игра продолжается");
+          //Показать поле
+          self.setState({shown: true});
+          //отображение текущего положения дел
+          self.updateFieldState(gameData.field);
+          self.setState({myTurn: gameData.nowTurn, myNumber: gameData.playerNumber})
 
-            //Показать поле
-            self.setState({shown: true});
-
-            //отображение текущего положения дел
-            self.updateFieldState(gameData.field);
-            self.setState({myTurn: gameData.nowTurn, myNumber: gameData.playerNumber})
-
-        });
-        //Процесс новой игры
-        socket.on('start game', function () {
-            console.log("Игра началась");
-
-            //Показать поле
-            self.setState({shown: true});
-
-            //отображение хода другого игрока
-            socket.on('other player turn',function(data){
-                self.updateFieldState(data.num, data.symbol);
-                socket.emit('other player turn getted');
-            });
-
-            //обработка события "ваш ход"
-            socket.on('your turn',function(symbol){
-                self.setState({myTurn: true});
-                self.setState({mySymbol: symbol});
-            });
         });
     },
 
@@ -80,7 +57,7 @@ var GameField = React.createClass({
                 }
                 this.setState({fieldState: tmp})
                 //отправить свой ход на сервер
-                socket.emit('turn done',{targetId: target.id});
+                socket.emit('turn done',{playerNumber: this.state.myNumber, targetId: target.id});
                 soundManager.play('turn_finished');
             }
         }

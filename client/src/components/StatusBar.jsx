@@ -11,32 +11,32 @@ var StatusBar = React.createClass({
     getInitialState: function () {
         return {
             shown: false,
-            text: ""
+            text: "",
+            connectionText: ""
         };
     },
     componentDidMount: function () {
         var self = this;
-        socket.on('game status', function () {
-            console.log("Игра началась");
+        socket.on('opponent status', function (data) {
+          console.log("opponentOffline: " + data.opponentOffline);
+          data.opponentOffline ? self.setState({connectionText: "Соперник не в сети"}) : self.setState({connectionText: ""});
+        });
+        socket.on('game status', function (data) {
+            //console.log("Игра началась");
             self.setState({shown: true});
 
-            socket.once('wait other player', function () {
-                self.setState({text: "Ход соперника..."});
-            });
+            if (data.nowTurn) {
+              soundManager.play('my_turn');
+              self.setState({text: "Ваш ход!"});
+            } else {
+              self.setState({text: "Ход соперника..."});
+            }
 
-            socket.on('opponent informed',function(){
-                self.setState({text: "Ход соперника..."});
-            });
-
-            //обработка события "ваш ход"
-            socket.on('your turn',function(symbol){
-                soundManager.play('my_turn');
-                self.setState({text: "Ваш ход!"});
-            });
+            //data.opponentOffline ? self.setState({connectionText: "Соперник не в сети"}) : self.setState({connectionText: ""});
 
             //Обработка события "конец игры"
             socket.once('end game', function(data){
-
+                socket.removeAllListeners('game status');
                 switch (data){
                     case "loose":
                         soundManager.play('loose');
@@ -66,7 +66,7 @@ var StatusBar = React.createClass({
     },
     render: function(){
         if (this.state.shown) {
-            return <div>{this.state.text} </div>
+            return <div>{this.state.text}<br/>{this.state.connectionText} </div>
         }
         else return <div></div>
     }

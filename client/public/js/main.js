@@ -153,42 +153,19 @@ var GameField = React.createClass({
             shown: false,
             fieldState: ["empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty"],
             myTurn: false,
-            mySymbol: 'x',
             myNumber: 1
         };
     },
 
     componentDidMount: function () {
         var self = this;
-        //Если приконнектился продолжать
-        socket.on('game status', function (gameData) {
-            console.log("Игра продолжается");
 
+        socket.on('game status', function (gameData) {
             //Показать поле
             self.setState({ shown: true });
-
             //отображение текущего положения дел
             self.updateFieldState(gameData.field);
             self.setState({ myTurn: gameData.nowTurn, myNumber: gameData.playerNumber });
-        });
-        //Процесс новой игры
-        socket.on('start game', function () {
-            console.log("Игра началась");
-
-            //Показать поле
-            self.setState({ shown: true });
-
-            //отображение хода другого игрока
-            socket.on('other player turn', function (data) {
-                self.updateFieldState(data.num, data.symbol);
-                socket.emit('other player turn getted');
-            });
-
-            //обработка события "ваш ход"
-            socket.on('your turn', function (symbol) {
-                self.setState({ myTurn: true });
-                self.setState({ mySymbol: symbol });
-            });
         });
     },
 
@@ -220,7 +197,7 @@ var GameField = React.createClass({
                 }
                 this.setState({ fieldState: tmp });
                 //отправить свой ход на сервер
-                socket.emit('turn done', { targetId: target.id });
+                socket.emit('turn done', { playerNumber: this.state.myNumber, targetId: target.id });
                 soundManager.play('turn_finished');
             }
         }
@@ -262,7 +239,8 @@ var InviteLink = React.createClass({
         return {
             link: "",
             shown: false,
-            comment: ""
+            comment: "",
+            roomID: ""
         };
     },
     componentDidMount: function () {
@@ -275,7 +253,7 @@ var InviteLink = React.createClass({
             self.setState({
                 shown: true,
                 link: link,
-                comment: "Ссылка (скопируйте и отправьте сопернику, чтобы начать игру): "
+                comment: "Ссылка: "
             });
         });
 
@@ -312,14 +290,42 @@ var InviteLink = React.createClass({
             });
         });
 
-        socket.on('start game', function () {
+        socket.on('game status', function () {
             console.log("Игра началась");
             self.setState({
                 shown: false
             });
         });
     },
+
     render: function () {
+        var additionalInfo = "";
+        if (this.state.link) {
+            additionalInfo = React.createElement(
+                'div',
+                null,
+                '(\u0441\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0441\u043E\u043F\u0435\u0440\u043D\u0438\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C \u0438\u0433\u0440\u0443)',
+                React.createElement('br', null),
+                React.createElement('br', null),
+                React.createElement(
+                    'b',
+                    null,
+                    '\u0418\u0433\u0440\u0430 \u043D\u0430\u0447\u043D\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438'
+                ),
+                React.createElement('br', null),
+                React.createElement('br', null),
+                '\u0427\u0442\u043E\u0431\u044B \u043F\u043E\u0442\u043E\u043C \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u043D\u0430\u0447\u0430\u0442\u0443\u044E \u0438\u0433\u0440\u0443, \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u0432 \u0430\u0434\u0440\u0435\u0441\u043D\u0443\u044E \u0441\u0442\u0440\u043E\u043A\u0443 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443:',
+                React.createElement('br', null),
+                React.createElement(
+                    'b',
+                    null,
+                    this.state.link,
+                    '1'
+                ),
+                React.createElement('br', null),
+                '\u0433\u0434\u0435 \u0446\u0438\u0444\u0440\u0430 1 \u0432 \u043A\u043E\u043D\u0446\u0435 - \u0432\u0430\u0448 \u043D\u043E\u043C\u0435\u0440. \u0423 \u043E\u043F\u043F\u043E\u043D\u0435\u043D\u0442\u0430 \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043D\u043D\u043E \u043D\u043E\u043C\u0435\u0440 2.'
+            );
+        };
         if (this.state.shown) {
             return React.createElement(
                 'div',
@@ -331,15 +337,13 @@ var InviteLink = React.createClass({
                 ),
                 React.createElement('br', null),
                 this.state.comment,
-                ' ',
                 React.createElement('br', null),
-                ' ',
                 React.createElement(
-                    'b',
+                    'h3',
                     null,
                     this.state.link
                 ),
-                ' '
+                additionalInfo
             );
         } else return React.createElement('div', null);
     }
@@ -388,32 +392,32 @@ var StatusBar = React.createClass({
     getInitialState: function () {
         return {
             shown: false,
-            text: ""
+            text: "",
+            connectionText: ""
         };
     },
     componentDidMount: function () {
         var self = this;
-        socket.on('game status', function () {
-            console.log("Игра началась");
+        socket.on('opponent status', function (data) {
+            console.log("opponentOffline: " + data.opponentOffline);
+            data.opponentOffline ? self.setState({ connectionText: "Соперник не в сети" }) : self.setState({ connectionText: "" });
+        });
+        socket.on('game status', function (data) {
+            //console.log("Игра началась");
             self.setState({ shown: true });
 
-            socket.once('wait other player', function () {
-                self.setState({ text: "Ход соперника..." });
-            });
-
-            socket.on('opponent informed', function () {
-                self.setState({ text: "Ход соперника..." });
-            });
-
-            //обработка события "ваш ход"
-            socket.on('your turn', function (symbol) {
+            if (data.nowTurn) {
                 soundManager.play('my_turn');
                 self.setState({ text: "Ваш ход!" });
-            });
+            } else {
+                self.setState({ text: "Ход соперника..." });
+            }
+
+            //data.opponentOffline ? self.setState({connectionText: "Соперник не в сети"}) : self.setState({connectionText: ""});
 
             //Обработка события "конец игры"
             socket.once('end game', function (data) {
-
+                socket.removeAllListeners('game status');
                 switch (data) {
                     case "loose":
                         soundManager.play('loose');
@@ -446,6 +450,8 @@ var StatusBar = React.createClass({
                 'div',
                 null,
                 this.state.text,
+                React.createElement('br', null),
+                this.state.connectionText,
                 ' '
             );
         } else return React.createElement('div', null);
