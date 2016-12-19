@@ -1,75 +1,18 @@
 //Компонент строки состояния
-
 var React = require('react');
 
-
-var socket = require('../../services/socket.js');
-
-var soundManager = require('../../sounds/sounds.js');
-
 var StatusBar = React.createClass({
-    getInitialState: function () {
-        return {
-            shown: false,
-            text: "",
-            connectionText: ""
-        };
-    },
-    componentDidMount: function () {
-        var self = this;
-        socket.on('opponent status', function (data) {
-          console.log("opponentOffline: " + data.opponentOffline);
-          data.opponentOffline ? self.setState({connectionText: "Соперник не в сети"}) : self.setState({connectionText: ""});
-        });
-        socket.on('game status', function (data) {
-            //console.log("Игра началась");
-            self.setState({shown: true});
-
-            if (data.nowTurn) {
-              soundManager.play('my_turn');
-              self.setState({text: "Ваш ход!"});
-            } else {
-              self.setState({text: "Ход соперника..."});
-            }
-
-            //data.opponentOffline ? self.setState({connectionText: "Соперник не в сети"}) : self.setState({connectionText: ""});
-
-            //Обработка события "конец игры"
-            socket.once('end game', function(data){
-                socket.removeAllListeners('game status');
-                switch (data){
-                    case "loose":
-                        soundManager.play('loose');
-                        self.setState({text: "Игра закончилась. Вы проиграли"});
-                        console.log("Игра закончилась. Вы проиграли");
-                        break;
-                    case "win":
-                        soundManager.play('win');
-                        self.setState({text: "Игра закончилась. Вы выиграли!! УРАА!"});
-                        console.log("Игра закончилась. Вы выиграли!! УРАА!");
-                        break;
-                    case "pat":
-                        soundManager.play('pat');
-                        self.setState({text: "Игра закончилась. Ничья"});
-                        console.log("Игра закончилась. Ничья");
-                        break;
-                    case "disconnect":
-                        soundManager.play('disconnect');
-                        self.setState({text: "Игра закончилась. Игрок отключился"});
-                        console.log("Дисконнект");
-                        break;
-                    default:
-                }
-            })
-        });
-
-    },
-    render: function(){
-        if (this.state.shown) {
-            return <div>{this.state.text}<br/>{this.state.connectionText} </div>
-        }
-        else return <div></div>
-    }
+  handleClick: function(){
+    this.props.multiButton.onClick();
+  },
+  render: function(){
+    return (
+      <div>
+        {this.props.text} <font color="#F5B1B1">{this.props.connectionText}</font> <br/><br/>
+        <button disabled={this.props.multiButton.disabled} onClick={this.handleClick} >{this.props.multiButton.text}</button>
+      </div>
+      )
+  }
 });
 
 module.exports = StatusBar;
