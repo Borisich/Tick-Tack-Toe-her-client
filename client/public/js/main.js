@@ -158,6 +158,7 @@ var GameField = React.createClass({
       myNumber: 1,
       statusText: "",
       connectionText: "",
+      buttonsDescriptionText: "",
       statusButton1: {
         disabled: true,
         visible: false,
@@ -182,7 +183,7 @@ var GameField = React.createClass({
     });
 
     //Обработка события "конец игры"
-    socket.once('end game', function (data) {
+    socket.on('end game', function (data) {
       socket.removeAllListeners('game status');
       switch (data) {
         case "loose":
@@ -235,47 +236,75 @@ var GameField = React.createClass({
       }
     });
   },
+  restartGame: function () {
+    var self = this;
+    socket.removeAllListeners('restart canceled');
+    self.addGameStatusListener();
+    self.setState({ statusButton1: {
+        disabled: false,
+        visible: false,
+        text: "",
+        onClick: function () {}
+      }
+    });
+  },
   sendRestartRequest: function () {
     var self = this;
     console.log('restart request sended');
+    self.setState({ statusButton1: {
+        disabled: true,
+        visible: true,
+        text: "Ожидание ответа соперника...",
+        onClick: self.sendRestartRequest
+      },
+      buttonsDescriptionText: ""
+    });
     socket.removeAllListeners('restart request');
+    console.log('restart request listening disabled');
     socket.emit('restart request', this.state.myNumber);
     socket.once('restart accepted', function () {
-      socket.removeAllListeners('restart canceled');
-      self.addGameStatusListener();
+      self.restartGame();
+    });
+    socket.on('restart canceled', function (data) {
+      console.log("Test");
+      socket.removeAllListeners('restart accepted');
+      self.receiveRestartRequest();
       self.setState({ statusButton1: {
           disabled: false,
-          visible: false,
-          text: "",
-          onClick: function () {}
-        }
+          visible: true,
+          text: "Начать заново",
+          onClick: self.sendRestartRequest
+        },
+        buttonsDescriptionText: "Соперник отклонил приглашение"
       });
-    });
-    socket.once('restart canceled', function (data) {
-      socket.removeAllListeners('restart accepted');
     });
   },
   receiveRestartRequest: function () {
     var self = this;
-    socket.once('restart request', function (data) {
+    console.log("Restart requesting enabled");
+
+    socket.on('restart request', function (data) {
+      console.log("Restart request from opponent getted");
       self.setState({
         statusButton1: {
           disabled: false,
           visible: true,
-          text: "Начать заново",
-          onClick: self.restartGame
+          text: "Ок",
+          onClick: self.restartGameAccepted
         },
         statusButton2: {
           disabled: false,
           visible: true,
-          text: "Отмена",
+          text: "Нет",
           onClick: self.cancelRestart
-        }
+        },
+        buttonsDescriptionText: "Соперник предлагает начать игру заново."
       });
     });
   },
-  restartGame: function () {
+  restartGameAccepted: function () {
     var self = this;
+    console.log("RestartGame function running");
     self.setState({
       statusButton1: {
         disabled: false,
@@ -288,25 +317,28 @@ var GameField = React.createClass({
         visible: false,
         text: "",
         onClick: function () {}
-      }
+      },
+      buttonsDescriptionText: ""
     });
     socket.emit('restart accepted');
+    self.restartGame();
   },
   cancelRestart: function () {
     var self = this;
     self.setState({
       statusButton1: {
         disabled: false,
-        visible: false,
-        text: "",
-        onClick: function () {}
+        visible: true,
+        text: "Начать заново",
+        onClick: self.sendRestartRequest
       },
       statusButton2: {
         disabled: false,
         visible: false,
         text: "",
         onClick: function () {}
-      }
+      },
+      buttonsDescriptionText: ""
     });
     socket.emit('restart canceled');
   },
@@ -374,7 +406,7 @@ var GameField = React.createClass({
         React.createElement(
           'div',
           null,
-          React.createElement(StatusBar, { text: this.state.statusText, connectionText: this.state.connectionText, multiButton: this.state.statusButton1 })
+          React.createElement(StatusBar, { text: this.state.statusText, connectionText: this.state.connectionText, button1: this.state.statusButton1, button2: this.state.statusButton2, buttonsDescriptionText: this.state.buttonsDescriptionText })
         )
       );
     } else return React.createElement('div', null);
@@ -541,10 +573,29 @@ var React = require('react');
 var StatusBar = React.createClass({
   displayName: "StatusBar",
 
-  handleClick: function () {
-    this.props.multiButton.onClick();
+  handleClickButton1: function () {
+    this.props.button1.onClick();
+  },
+  handleClickButton2: function () {
+    this.props.button2.onClick();
   },
   render: function () {
+    var button1 = null;
+    if (this.props.button1.visible) {
+      button1 = React.createElement(
+        "button",
+        { disabled: this.props.button1.disabled, onClick: this.handleClickButton1 },
+        this.props.button1.text
+      );
+    };
+    var button2 = null;
+    if (this.props.button2.visible) {
+      button2 = React.createElement(
+        "button",
+        { disabled: this.props.button2.disabled, onClick: this.handleClickButton2 },
+        this.props.button2.text
+      );
+    };
     return React.createElement(
       "div",
       null,
@@ -558,11 +609,12 @@ var StatusBar = React.createClass({
       " ",
       React.createElement("br", null),
       React.createElement("br", null),
-      React.createElement(
-        "button",
-        { disabled: this.props.multiButton.disabled, onClick: this.handleClick },
-        this.props.multiButton.text
-      )
+      this.props.buttonsDescriptionText,
+      " ",
+      React.createElement("br", null),
+      button1,
+      " ",
+      button2
     );
   }
 });
