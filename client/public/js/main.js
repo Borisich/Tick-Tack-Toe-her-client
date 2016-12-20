@@ -145,88 +145,245 @@ var React = require('react');
 var socket = require('../../services/socket.js');
 var soundManager = require('../../sounds/sounds.js');
 
+var StatusBar = require('./StatusBar.jsx');
+
 var GameField = React.createClass({
-    displayName: 'GameField',
+  displayName: 'GameField',
 
-    getInitialState: function () {
-        return {
-            shown: false,
-            fieldState: ["empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty"],
-            myTurn: false,
-            myNumber: 1
-        };
-    },
+  getInitialState: function () {
+    return {
+      shown: false,
+      fieldState: ["empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty"],
+      myTurn: false,
+      myNumber: 1,
+      statusText: "",
+      connectionText: "",
+      statusButton1: {
+        disabled: true,
+        visible: false,
+        text: "",
+        onClick: function () {}
+      },
+      statusButton2: {
+        disabled: true,
+        visible: false,
+        text: "",
+        onClick: function () {}
+      }
+    };
+  },
 
-    componentDidMount: function () {
-        var self = this;
+  componentDidMount: function () {
+    var self = this;
+    self.addGameStatusListener();
+    socket.on('opponent status', function (data) {
+      console.log("opponentOffline: " + data.opponentOffline);
+      data.opponentOffline ? self.setState({ connectionText: "Соперник не в сети" }) : self.setState({ connectionText: "" });
+    });
 
-        socket.on('game status', function (gameData) {
-            //Показать поле
-            self.setState({ shown: true });
-            //отображение текущего положения дел
-            self.updateFieldState(gameData.field);
-            self.setState({ myTurn: gameData.nowTurn, myNumber: gameData.playerNumber });
-        });
-    },
+    //Обработка события "конец игры"
+    socket.once('end game', function (data) {
+      socket.removeAllListeners('game status');
+      switch (data) {
+        case "loose":
+          soundManager.play('loose');
+          self.setState({ statusText: "Игра закончилась. Вы проиграли" });
+          console.log("Игра закончилась. Вы проиграли");
+          break;
+        case "win":
+          soundManager.play('win');
+          self.setState({ statusText: "Игра закончилась. Вы выиграли!! УРАА!" });
+          console.log("Игра закончилась. Вы выиграли!! УРАА!");
+          break;
+        case "pat":
+          soundManager.play('pat');
+          self.setState({ statusText: "Игра закончилась. Ничья" });
+          console.log("Игра закончилась. Ничья");
+          break;
+        case "disconnect":
+          soundManager.play('disconnect');
+          self.setState({ statusText: "Игра закончилась. Игрок отключился" });
+          console.log("Дисконнект");
+          break;
+        default:
+      }
+      //Показать кнопку "начать заново" и установить обработчик приема
 
-    updateFieldState: function (state) {
-        var tmp = [];
-        for (var i = 0; i < state.length; i++) {
-            if (state[i] == 1) {
-                tmp[i] = 'x';
-            } else if (state[i] == -1) {
-                tmp[i] = 'o';
-            } else {
-                tmp[i] = 'empty';
-            }
+      self.setState({ statusButton1: {
+          disabled: false,
+          visible: true,
+          text: "Начать заново",
+          onClick: self.sendRestartRequest
+        }
+      });
+      self.receiveRestartRequest();
+    });
+  },
+  addGameStatusListener: function () {
+    var self = this;
+    socket.on('game status', function (gameData) {
+      //Показать поле
+      self.setState({ shown: true });
+      //отображение текущего положения дел
+      self.updateFieldState(gameData.field);
+      self.setState({ myTurn: gameData.nowTurn, myNumber: gameData.playerNumber });
+      if (gameData.nowTurn) {
+        soundManager.play('my_turn');
+        self.setState({ statusText: "Ваш ход!" });
+      } else {
+        self.setState({ statusText: "Ход соперника..." });
+      }
+    });
+  },
+  sendRestartRequest: function () {
+    var self = this;
+    console.log('restart request sended');
+    socket.removeAllListeners('restart request');
+    socket.emit('restart request', this.state.myNumber);
+    socket.once('restart accepted', function () {
+      socket.removeAllListeners('restart canceled');
+      self.addGameStatusListener();
+      self.setState({ statusButton1: {
+          disabled: false,
+          visible: false,
+          text: "",
+          onClick: function () {}
+        }
+      });
+    });
+    socket.once('restart canceled', function (data) {
+      socket.removeAllListeners('restart accepted');
+    });
+  },
+  receiveRestartRequest: function () {
+    var self = this;
+    socket.once('restart request', function (data) {
+      self.setState({
+        statusButton1: {
+          disabled: false,
+          visible: true,
+          text: "Начать заново",
+          onClick: self.restartGame
+        },
+        statusButton2: {
+          disabled: false,
+          visible: true,
+          text: "Отмена",
+          onClick: self.cancelRestart
+        }
+      });
+    });
+  },
+  restartGame: function () {
+    var self = this;
+    self.setState({
+      statusButton1: {
+        disabled: false,
+        visible: false,
+        text: "",
+        onClick: function () {}
+      },
+      statusButton2: {
+        disabled: false,
+        visible: false,
+        text: "",
+        onClick: function () {}
+      }
+    });
+    socket.emit('restart accepted');
+  },
+  cancelRestart: function () {
+    var self = this;
+    self.setState({
+      statusButton1: {
+        disabled: false,
+        visible: false,
+        text: "",
+        onClick: function () {}
+      },
+      statusButton2: {
+        disabled: false,
+        visible: false,
+        text: "",
+        onClick: function () {}
+      }
+    });
+    socket.emit('restart canceled');
+  },
+  updateFieldState: function (state) {
+    var tmp = [];
+    for (var i = 0; i < state.length; i++) {
+      if (state[i] == 1) {
+        tmp[i] = 'x';
+      } else if (state[i] == -1) {
+        tmp[i] = 'o';
+      } else {
+        tmp[i] = 'empty';
+      }
+    }
+    this.setState({ fieldState: tmp });
+  },
+
+  clickHandler: function (e) {
+    if (this.state.myTurn) {
+      var target = e.target;
+      if (this.state.fieldState[target.id - 1] == "empty") {
+        this.setState({ myTurn: false });
+        //обновить поле
+        var tmp = this.state.fieldState;
+        if (this.state.myNumber == 1) {
+          tmp[target.id - 1] = "x";
+        } else if (this.state.myNumber == 2) {
+          tmp[target.id - 1] = "o";
         }
         this.setState({ fieldState: tmp });
-    },
-
-    clickHandler: function (e) {
-        if (this.state.myTurn) {
-            var target = e.target;
-            if (this.state.fieldState[target.id - 1] == "empty") {
-                this.setState({ myTurn: false });
-                //обновить поле
-                var tmp = this.state.fieldState;
-                if (this.state.myNumber == 1) {
-                    tmp[target.id - 1] = "x";
-                } else if (this.state.myNumber == 2) {
-                    tmp[target.id - 1] = "o";
-                }
-                this.setState({ fieldState: tmp });
-                //отправить свой ход на сервер
-                socket.emit('turn done', { playerNumber: this.state.myNumber, targetId: target.id });
-                soundManager.play('turn_finished');
-            }
-        }
-        console.log("fieldState: ");
-        console.log(this.state.fieldState);
-    },
-
-    render: function () {
-        if (this.state.shown) {
-            return React.createElement(
-                'div',
-                { onClick: this.clickHandler },
-                React.createElement('div', { id: '1', className: this.state.fieldState[0] }),
-                React.createElement('div', { id: '2', className: this.state.fieldState[1] }),
-                React.createElement('div', { id: '3', className: this.state.fieldState[2] }),
-                React.createElement('div', { id: '4', className: this.state.fieldState[3] }),
-                React.createElement('div', { id: '5', className: this.state.fieldState[4] }),
-                React.createElement('div', { id: '6', className: this.state.fieldState[5] }),
-                React.createElement('div', { id: '7', className: this.state.fieldState[6] }),
-                React.createElement('div', { id: '8', className: this.state.fieldState[7] }),
-                React.createElement('div', { id: '9', className: this.state.fieldState[8] })
-            );
-        } else return React.createElement('div', null);
+        //отправить свой ход на сервер
+        socket.emit('turn done', { playerNumber: this.state.myNumber, targetId: target.id });
+        soundManager.play('turn_finished');
+      }
     }
+    console.log("fieldState: ");
+    console.log(this.state.fieldState);
+  },
+
+  render: function () {
+    if (this.state.shown) {
+      /*var multiButton = {
+        text: "Hello",
+        disabled: false,
+        onClick: function(){
+          alert ("Click!")
+        }
+      };*/
+      return React.createElement(
+        'div',
+        null,
+        React.createElement(
+          'div',
+          { onClick: this.clickHandler },
+          React.createElement('div', { id: '1', className: this.state.fieldState[0] }),
+          React.createElement('div', { id: '2', className: this.state.fieldState[1] }),
+          React.createElement('div', { id: '3', className: this.state.fieldState[2] }),
+          React.createElement('div', { id: '4', className: this.state.fieldState[3] }),
+          React.createElement('div', { id: '5', className: this.state.fieldState[4] }),
+          React.createElement('div', { id: '6', className: this.state.fieldState[5] }),
+          React.createElement('div', { id: '7', className: this.state.fieldState[6] }),
+          React.createElement('div', { id: '8', className: this.state.fieldState[7] }),
+          React.createElement('div', { id: '9', className: this.state.fieldState[8] })
+        ),
+        React.createElement(
+          'div',
+          null,
+          React.createElement(StatusBar, { text: this.state.statusText, connectionText: this.state.connectionText, multiButton: this.state.statusButton1 })
+        )
+      );
+    } else return React.createElement('div', null);
+  }
 });
 
 module.exports = GameField;
 
-},{"../../services/socket.js":1,"../../sounds/sounds.js":2,"react":191}],5:[function(require,module,exports){
+},{"../../services/socket.js":1,"../../sounds/sounds.js":2,"./StatusBar.jsx":7,"react":191}],5:[function(require,module,exports){
 //компонент пригласительной ссылки
 var React = require('react');
 
@@ -379,102 +536,53 @@ module.exports = Messages;
 
 },{"react":191}],7:[function(require,module,exports){
 //Компонент строки состояния
-
 var React = require('react');
 
-var socket = require('../../services/socket.js');
-
-var soundManager = require('../../sounds/sounds.js');
-
 var StatusBar = React.createClass({
-    displayName: 'StatusBar',
+  displayName: "StatusBar",
 
-    getInitialState: function () {
-        return {
-            shown: false,
-            text: "",
-            connectionText: ""
-        };
-    },
-    componentDidMount: function () {
-        var self = this;
-        socket.on('opponent status', function (data) {
-            console.log("opponentOffline: " + data.opponentOffline);
-            data.opponentOffline ? self.setState({ connectionText: "Соперник не в сети" }) : self.setState({ connectionText: "" });
-        });
-        socket.on('game status', function (data) {
-            //console.log("Игра началась");
-            self.setState({ shown: true });
-
-            if (data.nowTurn) {
-                soundManager.play('my_turn');
-                self.setState({ text: "Ваш ход!" });
-            } else {
-                self.setState({ text: "Ход соперника..." });
-            }
-
-            //data.opponentOffline ? self.setState({connectionText: "Соперник не в сети"}) : self.setState({connectionText: ""});
-
-            //Обработка события "конец игры"
-            socket.once('end game', function (data) {
-                socket.removeAllListeners('game status');
-                switch (data) {
-                    case "loose":
-                        soundManager.play('loose');
-                        self.setState({ text: "Игра закончилась. Вы проиграли" });
-                        console.log("Игра закончилась. Вы проиграли");
-                        break;
-                    case "win":
-                        soundManager.play('win');
-                        self.setState({ text: "Игра закончилась. Вы выиграли!! УРАА!" });
-                        console.log("Игра закончилась. Вы выиграли!! УРАА!");
-                        break;
-                    case "pat":
-                        soundManager.play('pat');
-                        self.setState({ text: "Игра закончилась. Ничья" });
-                        console.log("Игра закончилась. Ничья");
-                        break;
-                    case "disconnect":
-                        soundManager.play('disconnect');
-                        self.setState({ text: "Игра закончилась. Игрок отключился" });
-                        console.log("Дисконнект");
-                        break;
-                    default:
-                }
-            });
-        });
-    },
-    render: function () {
-        if (this.state.shown) {
-            return React.createElement(
-                'div',
-                null,
-                this.state.text,
-                React.createElement('br', null),
-                this.state.connectionText,
-                ' '
-            );
-        } else return React.createElement('div', null);
-    }
+  handleClick: function () {
+    this.props.multiButton.onClick();
+  },
+  render: function () {
+    return React.createElement(
+      "div",
+      null,
+      this.props.text,
+      " ",
+      React.createElement(
+        "font",
+        { color: "#F5B1B1" },
+        this.props.connectionText
+      ),
+      " ",
+      React.createElement("br", null),
+      React.createElement("br", null),
+      React.createElement(
+        "button",
+        { disabled: this.props.multiButton.disabled, onClick: this.handleClick },
+        this.props.multiButton.text
+      )
+    );
+  }
 });
 
 module.exports = StatusBar;
 
-},{"../../services/socket.js":1,"../../sounds/sounds.js":2,"react":191}],8:[function(require,module,exports){
+},{"react":191}],8:[function(require,module,exports){
 var React = require('react');
 var ReactDOM = require('react-dom');
 
 var GameField = require('./components/GameField.jsx');
 var Chat = require('./components/Chat.jsx');
 var InviteLink = require('./components/InviteLink.jsx');
-var StatusBar = require('./components/StatusBar.jsx');
 
 ReactDOM.render(React.createElement(GameField, null), document.getElementById("field"));
 ReactDOM.render(React.createElement(Chat, null), document.getElementById("chat"));
 ReactDOM.render(React.createElement(InviteLink, null), document.getElementById("invitelink"));
-ReactDOM.render(React.createElement(StatusBar, null), document.getElementById("status"));
+//ReactDOM.render(<StatusBar/>, document.getElementById("status"));
 
-},{"./components/Chat.jsx":3,"./components/GameField.jsx":4,"./components/InviteLink.jsx":5,"./components/StatusBar.jsx":7,"react":191,"react-dom":11}],9:[function(require,module,exports){
+},{"./components/Chat.jsx":3,"./components/GameField.jsx":4,"./components/InviteLink.jsx":5,"react":191,"react-dom":11}],9:[function(require,module,exports){
 
 },{}],10:[function(require,module,exports){
 // shim for using process in browser
