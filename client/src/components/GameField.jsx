@@ -39,42 +39,46 @@ var GameField = React.createClass({
         });
 
         //Обработка события "конец игры"
-        socket.on('end game', function(data){
-            socket.removeAllListeners('game status');
-            switch (data){
-                case "loose":
-                    soundManager.play('loose');
-                    self.setState({statusText: "Игра закончилась. Вы проиграли"});
-                    console.log("Игра закончилась. Вы проиграли");
-                    break;
-                case "win":
-                    soundManager.play('win');
-                    self.setState({statusText: "Игра закончилась. Вы выиграли!! УРАА!"});
-                    console.log("Игра закончилась. Вы выиграли!! УРАА!");
-                    break;
-                case "pat":
-                    soundManager.play('pat');
-                    self.setState({statusText: "Игра закончилась. Ничья"});
-                    console.log("Игра закончилась. Ничья");
-                    break;
-                case "disconnect":
-                    soundManager.play('disconnect');
-                    self.setState({statusText: "Игра закончилась. Игрок отключился"});
-                    console.log("Дисконнект");
-                    break;
-                default:
-            }
-            //Показать кнопку "начать заново" и установить обработчик приема
+        self.addEndGameListenerOnce();
+    },
+    addEndGameListenerOnce: function(){
+      var self = this;
+      socket.once('end game', function(data){
+          socket.removeAllListeners('game status');
+          switch (data){
+              case "loose":
+                  soundManager.play('loose');
+                  self.setState({statusText: "Игра закончилась. Вы проиграли"});
+                  console.log("Игра закончилась. Вы проиграли");
+                  break;
+              case "win":
+                  soundManager.play('win');
+                  self.setState({statusText: "Игра закончилась. Вы выиграли!! УРАА!"});
+                  console.log("Игра закончилась. Вы выиграли!! УРАА!");
+                  break;
+              case "pat":
+                  soundManager.play('pat');
+                  self.setState({statusText: "Игра закончилась. Ничья"});
+                  console.log("Игра закончилась. Ничья");
+                  break;
+              case "disconnect":
+                  soundManager.play('disconnect');
+                  self.setState({statusText: "Игра закончилась. Игрок отключился"});
+                  console.log("Дисконнект");
+                  break;
+              default:
+          }
+          //Показать кнопку "начать заново" и установить обработчик приема
 
-            self.setState({statusButton1: {
-                disabled: false,
-                visible: true,
-                text: "Начать заново",
-                onClick: self.sendRestartRequest
-              }
-            });
-            self.receiveRestartRequest();
-        })
+          self.setState({statusButton1: {
+              disabled: false,
+              visible: true,
+              text: "Начать заново",
+              onClick: self.sendRestartRequest
+            }
+          });
+          self.receiveRestartRequest();
+      })
     },
     addGameStatusListener: function(){
       var self = this;
@@ -96,6 +100,7 @@ var GameField = React.createClass({
       var self = this;
       socket.removeAllListeners('restart canceled');
       self.addGameStatusListener();
+      self.addEndGameListenerOnce();
       self.setState({statusButton1: {
           disabled: false,
           visible: false,

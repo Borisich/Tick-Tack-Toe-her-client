@@ -183,7 +183,11 @@ var GameField = React.createClass({
     });
 
     //Обработка события "конец игры"
-    socket.on('end game', function (data) {
+    self.addEndGameListenerOnce();
+  },
+  addEndGameListenerOnce: function () {
+    var self = this;
+    socket.once('end game', function (data) {
       socket.removeAllListeners('game status');
       switch (data) {
         case "loose":
@@ -240,6 +244,7 @@ var GameField = React.createClass({
     var self = this;
     socket.removeAllListeners('restart canceled');
     self.addGameStatusListener();
+    self.addEndGameListenerOnce();
     self.setState({ statusButton1: {
         disabled: false,
         visible: false,
