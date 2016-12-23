@@ -245,13 +245,6 @@ var GameField = React.createClass({
 
     render: function(){
       if (this.state.shown) {
-          /*var multiButton = {
-            text: "Hello",
-            disabled: false,
-            onClick: function(){
-              alert ("Click!")
-            }
-          };*/
           return (
               <div>
 

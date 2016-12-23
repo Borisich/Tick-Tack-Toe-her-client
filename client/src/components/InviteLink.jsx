@@ -22,7 +22,7 @@ var InviteLink = React.createClass({
             self.setState({
                 shown: true,
                 link: link,
-                comment: "Ссылка: "
+                comment: "Ссылка для приглашения соперника: "
             });
         });
 
@@ -60,8 +60,16 @@ var InviteLink = React.createClass({
             });
         });
 
-        socket.on('game status', function () {
+        socket.once('game status', function () {
             console.log("Игра началась");
+            //alert("Игра началась");
+            if (self.state.link){ //если не игрок 2
+              //alert("REDIRECTING");
+              if((window.location.href + window.location.search) != (self.state.link + "1")){
+                //alert("REDIR "+self.state.link + "1");
+                window.location.replace(self.state.link + "1");
+              }
+            }
             self.setState({
                 shown: false
             });
@@ -78,11 +86,9 @@ var InviteLink = React.createClass({
             <br/><br/>
             <b>Игра начнется автоматически</b>
             <br/><br/>
-            Чтобы потом продолжить начатую игру, введите в адресную строку следующую ссылку:
+            Вас перекинет по адресу <b>{this.state.link}1</b><br/>
+            Чтобы потом продолжить начатую игру, запомните этот адрес.
             <br/>
-            <b>{this.state.link}1</b>
-            <br/>
-            где цифра 1 в конце - ваш номер. У оппонента соответственно номер 2.
           </div>
         };
         if (this.state.shown) {
@@ -93,7 +99,7 @@ var InviteLink = React.createClass({
               {this.state.comment}
               <br/>
 
-              <h3>{this.state.link}</h3>
+              <h3>{this.state.link+"2"}</h3>
 
               {additionalInfo}
 
